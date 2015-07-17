@@ -53,6 +53,7 @@
   #include <vtkPNGReader.h>
   #include <vtkJPEGReader.h>
   #include <vtkPNMReader.h>
+  #include <vtkPNGWriter.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -190,10 +191,10 @@ pcl::ImageGrabberBase::ImageGrabberImpl::ImageGrabberImpl (pcl::ImageGrabberBase
   , pclzf_mode_(pclzf_mode)
   , depth_image_units_ (1E-3f)
   , manual_intrinsics_ (false)
-  , focal_length_x_ (525.)
-  , focal_length_y_ (525.)
-  , principal_point_x_ (319.5)
-  , principal_point_y_ (239.5)
+  , focal_length_x_ (470.9056907f)
+  , focal_length_y_ (470.9056907f)
+  , principal_point_x_ (399.5)
+  , principal_point_y_ (299.5)
   , num_threads_ (1)
 {
   if(pclzf_mode_)
@@ -227,10 +228,10 @@ pcl::ImageGrabberBase::ImageGrabberImpl::ImageGrabberImpl (pcl::ImageGrabberBase
   , pclzf_mode_ (false)
   , depth_image_units_ (1E-3f)
   , manual_intrinsics_ (false)
-  , focal_length_x_ (525.)
-  , focal_length_y_ (525.)
-  , principal_point_x_ (319.5)
-  , principal_point_y_ (239.5)
+  , focal_length_x_ (470.9056907f)
+  , focal_length_y_ (470.9056907f)
+  , principal_point_x_ (399.5)
+  , principal_point_y_ (299.5)
   , num_threads_ (1)
 {
   loadDepthAndRGBFiles (depth_dir, rgb_dir);
@@ -256,10 +257,14 @@ pcl::ImageGrabberBase::ImageGrabberImpl::ImageGrabberImpl (pcl::ImageGrabberBase
   , pclzf_mode_ (false)
   , depth_image_units_ (1E-3f)
   , manual_intrinsics_ (false)
-  , focal_length_x_ (525.)
-  , focal_length_y_ (525.)
-  , principal_point_x_ (319.5)
-  , principal_point_y_ (239.5)
+//  , focal_length_x_ (525.)
+//  , focal_length_y_ (525.)
+//  , principal_point_x_ (319.5)
+//  , principal_point_y_ (239.5)
+  , focal_length_x_ (470.9056907f)
+  , focal_length_y_ (470.9056907f)
+  , principal_point_x_ (399.5)
+  , principal_point_y_ (299.5)
   , num_threads_ (1)
 {
   depth_image_files_ = depth_image_files;
@@ -553,7 +558,7 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
   {
     return (false);
   }
-  unsigned short* depth_pixel;
+  unsigned char* depth_pixel;
   unsigned char* color_pixel;
   vtkSmartPointer<vtkImageData> depth_image;
   vtkSmartPointer<vtkImageData> rgb_image;
@@ -572,10 +577,11 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
   {
     return (false);
   }
+
   int* dims = depth_image->GetDimensions ();
 
   // Fill in image data
-  depth_pixel = static_cast<unsigned short*>(depth_image->GetScalarPointer ());
+  depth_pixel = static_cast<unsigned char*>(depth_image->GetScalarPointer ());
   
   // Set up intrinsics
   float scaleFactorX, scaleFactorY;
@@ -609,6 +615,7 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
       {
         pcl::PointXYZRGBA &pt = cloud_color.at (x,y);
         float depth = static_cast<float> (*depth_pixel) * depth_image_units_;
+
         if (depth == 0.0f) 
           pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
         else
@@ -646,6 +653,7 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
       {
         pcl::PointXYZ &pt = cloud.at (x,y);
         float depth = static_cast<float> (*depth_pixel) * depth_image_units_;
+        //cout << "depth: " << depth << endl;
         if (depth == 0.0f) 
           pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
         else
@@ -858,6 +866,14 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getVtkImage (
   reader->SetFileName (filename.c_str ());
   reader->Update ();
   image = reader->GetOutput ();
+
+//  std::string outputFilename = "out.png";
+
+//  vtkSmartPointer<vtkPNGWriter> writer = vtkSmartPointer<vtkPNGWriter>::New();
+//  writer->SetFileName(outputFilename.c_str());
+//  writer->SetInputData(image);
+//  writer->Write();
+
   return (true);
 }
 #endif //PCL_BUILT_WITH_VTK
