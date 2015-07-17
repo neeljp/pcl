@@ -622,7 +622,7 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
   Matrix3frm current_global_rotation;
   Vector3f current_global_translation;
   // Call ICP
-  if(!performICP(intr, last_known_global_rotation, last_known_global_translation, current_global_rotation, current_global_translation))
+ if(!performICP(intr, last_known_global_rotation, last_known_global_translation, current_global_rotation, current_global_translation))
   {
     // ICP based on synthetic maps failed -> try to estimate the current camera pose based on previous and current raw maps
     Matrix3frm delta_rotation;
@@ -640,6 +640,7 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
     // save current vertex and normal maps
     saveCurrentMaps ();
     return (true);
+
   }
   else
   {
@@ -650,7 +651,9 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
     // Update last estimated pose to current pairwise ICP result
     last_estimated_translation_ = current_global_translation;
     last_estimated_rotation_ = current_global_rotation;
-  }  
+    cout <<"trans: "<< last_known_global_translation<<endl;
+    cout << "rot: "<< current_global_rotation<< endl;
+    }
 
   ///////////////////////////////////////////////////////////////////////////////////////////  
   // check if we need to shift

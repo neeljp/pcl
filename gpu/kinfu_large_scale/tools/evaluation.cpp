@@ -88,6 +88,8 @@ Evaluation::Evaluation(const std::string& folder) : folder_(folder), visualizati
   readFile(rgb_file, rgb_stamps_and_filenames_);  
 
   string associated_file = folder_ + "associated.txt";
+
+  cout << "eval" << endl;
 }
 
 void Evaluation::setMatchFile(const std::string& file)
@@ -252,33 +254,33 @@ bool Evaluation::grab (double stamp, PtrStepSz<const unsigned short>& depth, Ptr
   return true;  
 }
 
-void Evaluation::saveAllPoses(const pcl::gpu::KinfuTracker& kinfu, int frame_number, const std::string& logfile) const
-{   
-  size_t total = accociations_.empty() ? depth_stamps_and_filenames_.size() : accociations_.size();
+//void Evaluation::saveAllPoses(const pcl::gpu::kinfuLS::KinfuTracker& kinfu, int frame_number, const std::string& logfile) const
+//{
+//  size_t total = accociations_.empty() ? depth_stamps_and_filenames_.size() : accociations_.size();
 
-  if (frame_number < 0)
-      frame_number = (int)total;
+//  if (frame_number < 0)
+//      frame_number = (int)total;
 
-  frame_number = std::min(frame_number, (int)kinfu.getNumberOfPoses());
+//  frame_number = std::min(frame_number, (int)kinfu.getNumberOfPoses());
 
-  cout << "Writing " << frame_number << " poses to " << logfile << endl;
+//  cout << "Writing " << frame_number << " poses to " << logfile << endl;
   
-  ofstream path_file_stream(logfile.c_str());
-  path_file_stream.setf(ios::fixed,ios::floatfield);
+//  ofstream path_file_stream(logfile.c_str());
+//  path_file_stream.setf(ios::fixed,ios::floatfield);
   
-  for(int i = 0; i < frame_number; ++i)
-  {
-    Eigen::Affine3f pose = kinfu.getCameraPose(i);
-    Eigen::Quaternionf q(pose.rotation());
-    Eigen::Vector3f t = pose.translation();
+//  for(int i = 0; i < frame_number; ++i)
+//  {
+//    Eigen::Affine3f pose = kinfu.getCameraPose(i);
+//    Eigen::Quaternionf q(pose.rotation());
+//    Eigen::Vector3f t = pose.translation();
 
-    double stamp = accociations_.empty() ? depth_stamps_and_filenames_[i].first : accociations_[i].time1;
+//    double stamp = accociations_.empty() ? depth_stamps_and_filenames_[i].first : accociations_[i].time1;
 
-    path_file_stream << stamp << " ";
-    path_file_stream << t[0] << " " << t[1] << " " << t[2] << " ";
-    path_file_stream << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
-  }
-}
+//    path_file_stream << stamp << " ";
+//    path_file_stream << t[0] << " " << t[1] << " " << t[2] << " ";
+//    path_file_stream << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
+//  }
+//}
 
 
 #endif /* HAVE_OPENCV */

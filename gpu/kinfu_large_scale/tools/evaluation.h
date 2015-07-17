@@ -78,7 +78,7 @@ public:
   const static float fx, fy, cx, cy;
 
 
-  void saveAllPoses(const pcl::gpu::kinfuLS::KinfuTracker& kinfu, int frame_number = -1, const std::string& logfile = "kinfu_poses.txt") const;
+  //void saveAllPoses(const pcl::gpu::kinfuLS::KinfuTracker& kinfu, int frame_number = -1, const std::string& logfile = "kinfu_poses.txt") const;
 
 private:
   std::string folder_;

@@ -23,6 +23,7 @@ if(OPENNI_FOUND)
   PCL_ADD_EXECUTABLE_OPT_BUNDLE("${the_target}" "${SUBSYS_NAME}" ${srcs} ${hdrs})
   target_link_libraries("${the_target}" pcl_common pcl_io ${OPENNI_LIBRARIES} pcl_visualization pcl_gpu_kinfu_large_scale pcl_kdtree pcl_features pcl_surface)
 
+
   ## KINECT FUSION
   set(the_target pcl_kinfu_largeScale)
   set(srcs kinfuLS_app.cpp capture.cpp evaluation.cpp)
@@ -31,6 +32,9 @@ if(OPENNI_FOUND)
 
   PCL_ADD_EXECUTABLE_OPT_BUNDLE("${the_target}" "${SUBSYS_NAME}" ${srcs} ${hdrs})
   target_link_libraries("${the_target}" pcl_common pcl_io ${OPENNI_LIBRARIES} pcl_visualization pcl_gpu_kinfu_large_scale pcl_octree)
+    if(OpenCV_FOUND)
+        target_link_libraries(${the_target} ${OpenCV_LIBS})
+  endif() 
   
   ## STANDALONE MARCHING CUBES
   set(the_target pcl_kinfu_largeScale_mesh_output)
