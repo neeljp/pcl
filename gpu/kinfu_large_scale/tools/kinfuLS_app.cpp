@@ -413,9 +413,9 @@ struct SceneCloudView
   inline void 
   drawCamera (Eigen::Affine3f& pose, const string& name, double r, double g, double b)
   {
-    double focal = 575;
-    double height = 480;
-    double width = 640;
+    double focal = 470.9056907f;
+    double height = 600;
+    double width = 800;
     
     // create a 5-point visual for each camera
     pcl::PointXYZ p1, p2, p3, p4, p5;
@@ -723,6 +723,8 @@ struct KinFuLSApp
     kinfu_->setIcpCorespFilteringParams (0.1f/*meters*/, sin ( pcl::deg2rad(20.f) ));
     //kinfu_->setDepthTruncationForICP(3.f/*meters*/);
     kinfu_->setCameraMovementThreshold(0.001f);
+    kinfu_->setDepthIntrinsics (focal_length_, focal_length_, 399.5f ,299.5f);
+    kinfu_->setDisableICP();
 
     //Init KinFuLSApp            
     tsdf_cloud_ptr_ = pcl::PointCloud<pcl::PointXYZI>::Ptr (new pcl::PointCloud<pcl::PointXYZI>);
@@ -742,7 +744,8 @@ struct KinFuLSApp
 
     float height = 600.0f;
     float width = 800.0f;
-    screenshot_manager_.setCameraIntrinsics (pcl::device::kinfuLS::FOCAL_LENGTH, height, width);
+    screenshot_manager_.setCameraIntrinsics (focal_length_, height, width);
+    //cout << pcl::device::kinfuLS::FOCAL_LENGTH << endl;
     snapshot_rate_ = snapshotRate;
     
     Eigen::Matrix3f Rid = Eigen::Matrix3f::Identity ();   // * AngleAxisf( pcl::deg2rad(-30.f), Vector3f::UnitX());
@@ -824,12 +827,17 @@ struct KinFuLSApp
 
       {
         SampledScopeTime fps(time_ms_);
-
+        Eigen::Affine3f pose = kinfu_->getCameraPose();
+        cout << pose.matrix() << endl;
+        Eigen::Matrix3f R = Eigen::Matrix3f::Identity ();   // * AngleAxisf( pcl::deg2rad(-30.f), Vector3f::UnitX());
+        Eigen::Vector3f t = Vector3f (-0.21329967, 0.12048298, -0.18984134);
+         t = pose.translation() -t;
+        pose = Eigen::Translation3f(t) * Eigen::AngleAxisf(R);
         //run kinfu algorithm
         if (integrate_colors_)
           has_image = (*kinfu_) (depth_device_, image_view_.colors_device_);
         else
-          has_image = (*kinfu_) (depth_device_);
+          has_image = (*kinfu_) (depth_device_,pose);
       }
 
       image_view_.showDepth (depth_);
@@ -1416,7 +1424,7 @@ main (int argc, char* argv[])
   if (pc::parse_argument (argc, argv, "-rgbd", rgbd_folder) > 0)
   {
         app.rgbd_source_=true;
-        float fx=800.0f,fy=600.0f,cx=399.5f ,cy=299.5f;
+        float fx=470.9056907f,fy=470.9056907f,cx=399.5f ,cy=299.5f;
         app.initRGBDMode(fx, fy, cx, cy);
 
   }

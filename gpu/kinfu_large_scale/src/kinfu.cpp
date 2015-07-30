@@ -368,8 +368,8 @@ pcl::gpu::kinfuLS::KinfuTracker::performICP(const Intr& cam_intrinsics, Matrix3f
   
   if(disable_icp_)
   {
-    lost_=true;
-    return (false);
+    lost_=false;
+    return (true);
   }
   
   // Compute inverse rotation
@@ -566,7 +566,7 @@ pcl::gpu::kinfuLS::KinfuTracker::performPairWiseICP(const Intr cam_intrinsics, M
 }
 
 bool
-pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
+pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw,  const Eigen::Affine3f& pose)
 { 
   // Intrisics of the camera
   Intr intr (fx_, fy_, cx_, cy_);
@@ -618,15 +618,16 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
   // Get the last-known pose
   Matrix3frm last_known_global_rotation = rmats_[global_time_ - 1];            // [Ri|ti] - pos of camera, i.e.
   Vector3f   last_known_global_translation = tvecs_[global_time_ - 1];          // transform from camera to global coo space for (i-1)th camera pose
-  // Declare variables to host ICP results 
-  Matrix3frm current_global_rotation;
-  Vector3f current_global_translation;
+  // Declare variables to host ICP results
+  Matrix3frm current_global_rotation  = pose.rotation ();
+  Vector3f current_global_translation = pose.translation ();
+
   // Call ICP
  if(!performICP(intr, last_known_global_rotation, last_known_global_translation, current_global_rotation, current_global_translation))
   {
     // ICP based on synthetic maps failed -> try to estimate the current camera pose based on previous and current raw maps
     Matrix3frm delta_rotation;
-    Vector3f delta_translation;    
+    Vector3f delta_translation;
     if(!performPairWiseICP(intr, delta_rotation, delta_translation))
     {
       // save current vertex and normal maps
@@ -646,13 +647,11 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
   {
     // ICP based on synthetic maps succeeded
     // Save newly-computed pose
-    rmats_.push_back (current_global_rotation); 
+    rmats_.push_back (current_global_rotation);
     tvecs_.push_back (current_global_translation);
     // Update last estimated pose to current pairwise ICP result
     last_estimated_translation_ = current_global_translation;
     last_estimated_rotation_ = current_global_rotation;
-    cout <<"trans: "<< last_known_global_translation<<endl;
-    cout << "rot: "<< current_global_rotation<< endl;
     }
 
   ///////////////////////////////////////////////////////////////////////////////////////////  
@@ -673,7 +672,8 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw)
   // Integration check - We do not integrate volume if camera does not move far enought.  
   {
     float rnorm = rodrigues2(current_global_rotation.inverse() * last_known_global_rotation).norm();
-    float tnorm = (current_global_translation - last_known_global_translation).norm();    
+    float tnorm = (current_global_translation - last_known_global_translation).norm();
+    cout << current_global_translation << last_known_global_translation << endl;
     const float alpha = 1.f;
     bool integrate = (rnorm + alpha * tnorm)/2 >= integration_metric_threshold_;
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -821,7 +821,7 @@ pcl::gpu::kinfuLS::KinfuTracker::initColorIntegration(int max_weight)
 bool 
 pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth, const View& colors)
 { 
-  bool res = (*this)(depth);
+  bool res = false; //(*this)(depth);
 
   if (res && color_volume_)
   {

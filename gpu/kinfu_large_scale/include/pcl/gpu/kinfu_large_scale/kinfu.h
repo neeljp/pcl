@@ -150,7 +150,7 @@ namespace pcl
             * \param[in] depth next frame with values in millimeters
             * \return true if can render 3D view.
             */
-          bool operator() (const DepthMap& depth);
+          bool operator() (const DepthMap& depth,const Eigen::Affine3f& pose);
 
           /** \brief Processes next frame (both depth and color integration). Please call initColorIntegration before invpoking this.
             * \param[in] depth next depth frame with values in millimeters
