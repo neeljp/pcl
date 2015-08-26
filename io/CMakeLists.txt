@@ -12,6 +12,9 @@ endif(WIN32)
 
 PCL_ADD_DOC("${SUBSYS_NAME}")
 
+INCLUDE_DIRECTORIES(/usr/local/include/BIAS/)
+
+
 if(build)
     ## OpenNI 2.x
     OPTION(BUILD_OPENNI2 "Build the OpenNI 2 Grabber." OFF)
@@ -333,7 +336,7 @@ if(build)
     link_directories(${VTK_LINK_DIRECTORIES})
     target_link_libraries("${LIB_NAME}" pcl_common pcl_io_ply ${VTK_LIBRARIES} )
     if(PNG_FOUND)
-      target_link_libraries("${LIB_NAME}" ${PNG_LIBRARIES})
+      target_link_libraries("${LIB_NAME}" ${PNG_LIBRARY})
     endif(PNG_FOUND)
 
     if(LIBUSB_1_FOUND)
@@ -371,6 +374,8 @@ if(build)
     if (PCAP_FOUND)
       target_link_libraries("${LIB_NAME}" ${PCAP_LIBRARIES})
     endif(PCAP_FOUND)
+
+    TARGET_LINK_LIBRARIES("${LIB_NAME}" libBIASImageD.so libBIASGeometryD.so libBIASMathBaseD.so libBIASImageBaseD.so libBIASGeometryBaseD.so)
 
     set(EXT_DEPS eigen3)
 

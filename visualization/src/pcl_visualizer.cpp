@@ -1034,7 +1034,7 @@ namespace
 int
 getDefaultScalarInterpolationForDataSet (vtkDataSet* data)
 {
-  vtkPolyData* polyData = vtkPolyData::SafeDownCast (data); // Check that polyData != NULL in case of segfault
+  vtkPolyData* polyData = vtkPolyData::SafeDownCast (data);
   return (polyData && polyData->GetNumberOfCells () != polyData->GetNumberOfVerts ());
 }
 
@@ -1271,8 +1271,6 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
   }
   // Get the actor pointer
   vtkLODActor* actor = vtkLODActor::SafeDownCast (am_it->second.actor);
-  if (!actor)
-    return (false);
 
   switch (property)
   {
@@ -1303,8 +1301,6 @@ pcl::visualization::PCLVisualizer::getPointCloudRenderingProperties (int propert
     return (false);
   // Get the actor pointer
   vtkLODActor* actor = vtkLODActor::SafeDownCast (am_it->second.actor);
-  if (!actor)
-    return (false);
 
   switch (property)
   {
@@ -1350,8 +1346,6 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
   }
   // Get the actor pointer
   vtkLODActor* actor = vtkLODActor::SafeDownCast (am_it->second.actor);
-  if (!actor)
-    return (false);
 
   switch (property)
   {
@@ -1407,8 +1401,6 @@ pcl::visualization::PCLVisualizer::setPointCloudSelected (const bool selected, c
   }
   // Get the actor pointer
   vtkLODActor* actor = vtkLODActor::SafeDownCast (am_it->second.actor);
-  if (!actor)
-    return (false);
 
   if (selected)
   {
@@ -1440,8 +1432,6 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
   }
   // Get the actor pointer
   vtkActor* actor = vtkActor::SafeDownCast (am_it->second);
-  if (!actor)
-    return (false);
 
   switch (property)
   {
@@ -1487,8 +1477,6 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
   }
   // Get the actor pointer
   vtkActor* actor = vtkActor::SafeDownCast (am_it->second);
-  if (!actor)
-    return (false);
 
   switch (property)
   {
@@ -1513,8 +1501,6 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
     case PCL_VISUALIZER_FONT_SIZE:
     {
       vtkTextActor* text_actor = vtkTextActor::SafeDownCast (am_it->second);
-      if (!text_actor)
-        return (false);
       vtkSmartPointer<vtkTextProperty> tprop = text_actor->GetTextProperty ();
       tprop->SetFontSize (int (value));
       text_actor->Modified ();
@@ -1724,9 +1710,6 @@ pcl::visualization::PCLVisualizer::updateShapePose (const std::string &id, const
   else
     actor = vtkLODActor::SafeDownCast (am_it->second);
 
-  if (!actor)
-    return (false);
-
   vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New ();
 
   convertToVtkMatrix (pose.matrix (), matrix);
@@ -1749,9 +1732,6 @@ pcl::visualization::PCLVisualizer::updateCoordinateSystemPose (const std::string
     return (false);
   else
     actor = vtkLODActor::SafeDownCast (am_it->second);
-
-  if (!actor)
-    return (false);
 
   vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New ();
 
@@ -2684,12 +2664,11 @@ pcl::visualization::PCLVisualizer::updateText (const std::string &text, int xpos
 
   // Retrieve the Actor
   vtkTextActor* actor = vtkTextActor::SafeDownCast (am_it->second);
-  if (!actor)
-    return (false);
-
   actor->SetPosition (xpos, ypos);
   actor->SetInput (text.c_str ());
+
   actor->Modified ();
+
   return (true);
 }
 
@@ -2710,8 +2689,6 @@ pcl::visualization::PCLVisualizer::updateText (const std::string &text, int xpos
 
   // Create the Actor
   vtkTextActor* actor = vtkTextActor::SafeDownCast (am_it->second);
-  if (!actor)
-    return (false);
   actor->SetPosition (xpos, ypos);
   actor->SetInput (text.c_str ());
 
@@ -2739,8 +2716,6 @@ pcl::visualization::PCLVisualizer::updateText (const std::string &text, int xpos
 
   // Retrieve the Actor
   vtkTextActor *actor = vtkTextActor::SafeDownCast (am_it->second);
-  if (!actor)
-    return (false);
 
   actor->SetPosition (xpos, ypos);
   actor->SetInput (text.c_str ());
@@ -3235,8 +3210,6 @@ pcl::visualization::PCLVisualizer::addTextureMesh (const pcl::TextureMesh &mesh,
 
   vtkSmartPointer<vtkLODActor> actor = vtkSmartPointer<vtkLODActor>::New ();
   vtkOpenGLHardwareSupport* hardware = vtkOpenGLRenderWindow::SafeDownCast (win_)->GetHardwareSupport ();
-  if (!hardware)
-    return (false);
   bool supported = hardware->GetSupportsMultiTexturing ();
   // Check if hardware support multi texture
   std::size_t texture_units (hardware->GetNumberOfFixedTextureUnits ());
@@ -3772,10 +3745,8 @@ pcl::visualization::PCLVisualizer::renderViewTesselatedSphere (
        continue;
      }
 
-     vtkSmartPointer<vtkIdTypeArray> ids;
+     vtkSmartPointer<vtkIdTypeArray> ids = vtkSmartPointer<vtkIdTypeArray>::New ();
      ids = vtkIdTypeArray::SafeDownCast(hdw_selection->GetNode(0)->GetSelectionList());
-     if (!ids)
-       return;
      double visible_area = 0;
      for (int sel_id = 0; sel_id < (ids->GetNumberOfTuples ()); sel_id++)
      {

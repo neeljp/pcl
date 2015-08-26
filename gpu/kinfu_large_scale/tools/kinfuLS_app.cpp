@@ -298,7 +298,7 @@ struct ImageView
   {
     viewerScene_.setWindowTitle ("View3D from ray tracing");
     viewerScene_.setPosition (0, 0);
-    viewerDepth_.setWindowTitle ("Kinect Depth stream");
+    viewerDepth_.setWindowTitle ("Depth stream");
     viewerDepth_.setPosition (640, 0);
     //viewerColor_.setWindowTitle ("Kinect RGB stream");
   }
@@ -401,7 +401,7 @@ struct SceneCloudView
     cloud_viewer_.addCoordinateSystem (1.0, "global");
     cloud_viewer_.initCameraParameters ();
     cloud_viewer_.setPosition (0, 500);
-    cloud_viewer_.setSize (640, 480);
+    cloud_viewer_.setSize (800, 600);
     cloud_viewer_.setCameraClipDistances (0.01, 10.01);
 
     cloud_viewer_.addText ("H: print help", 2, 15, 20, 34, 135, 246);         
@@ -695,7 +695,7 @@ struct KinFuLSApp
 {
   enum { PCD_BIN = 1, PCD_ASCII = 2, PLY = 3, MESH_PLY = 7, MESH_VTK = 8 };
 
-  KinFuLSApp(pcl::Grabber& source, float vsz, float shiftDistance, int snapshotRate) : exit_ (false), scan_ (false), scan_mesh_(false), scan_volume_ (false), independent_camera_ (false),
+  KinFuLSApp(pcl::Grabber& source, float vsz, float shiftDistance, int snapshotRate,bool disable_icp) : exit_ (false), scan_ (false), scan_mesh_(false), scan_volume_ (false), independent_camera_ (false),
           registration_ (false), integrate_colors_ (false), pcd_source_ (false), rgbd_source_ (false), focal_length_(470.9056907f), capture_ (source), was_lost_(false), time_ms_ (0)
   {    
     //Init Kinfu Tracker
@@ -717,6 +717,7 @@ struct KinFuLSApp
     Eigen::Vector3f t = volume_size * 0.5f - Vector3f (0, 0, volume_size (2) / 2 * 1.2f);
 
     Eigen::Affine3f pose = Eigen::Translation3f (t) * Eigen::AngleAxisf (R);
+    initial_pose_ = pose;
 
     kinfu_->setInitialCameraPose (pose);
     kinfu_->volume().setTsdfTruncDist (0.030f/*meters*/);
@@ -724,7 +725,8 @@ struct KinFuLSApp
     //kinfu_->setDepthTruncationForICP(3.f/*meters*/);
     kinfu_->setCameraMovementThreshold(0.001f);
     kinfu_->setDepthIntrinsics (focal_length_, focal_length_, 399.5f ,299.5f);
-    kinfu_->setDisableICP();
+    if(disable_icp)
+        kinfu_->setDisableICP();
 
     //Init KinFuLSApp            
     tsdf_cloud_ptr_ = pcl::PointCloud<pcl::PointXYZI>::Ptr (new pcl::PointCloud<pcl::PointXYZI>);
@@ -805,6 +807,7 @@ struct KinFuLSApp
     image_view_.raycaster_ptr_ = RayCaster::Ptr( new RayCaster(kinfu_->rows (), kinfu_->cols (), evaluation_ptr_->fx, evaluation_ptr_->fy, evaluation_ptr_->cx, evaluation_ptr_->cy) );
   }
   void
+
   initRGBDMode(const float fx,const float fy,const float cx,const float cy)
   {
 
@@ -827,17 +830,27 @@ struct KinFuLSApp
 
       {
         SampledScopeTime fps(time_ms_);
-        Eigen::Affine3f pose = kinfu_->getCameraPose();
-        cout << pose.matrix() << endl;
-        Eigen::Matrix3f R = Eigen::Matrix3f::Identity ();   // * AngleAxisf( pcl::deg2rad(-30.f), Vector3f::UnitX());
-        Eigen::Vector3f t = Vector3f (-0.21329967, 0.12048298, -0.18984134);
-         t = pose.translation() -t;
-        pose = Eigen::Translation3f(t) * Eigen::AngleAxisf(R);
+        Eigen::Affine3f pose;
+        Eigen::Vector3f V = pose_.linear().transpose() * Translation3f(pose_.translation()).vector() - org_pose_.linear().transpose() * Translation3f(org_pose_.translation()).vector();
+        Eigen::Translation3f T =  Translation3f(V+Translation3f(initial_pose_.translation()).vector());
+
+        Eigen::Matrix3f R =   pose_.linear().transpose() * org_pose_.linear();
+
+        pose = T * AngleAxisf(R);
+        cout <<"vector: " <<V << endl << "translation: " <<T.vector()<< endl
+            <<"rotation: " << R <<endl
+           << "pose: " << pose.matrix()<< endl;
+
+
         //run kinfu algorithm
         if (integrate_colors_)
           has_image = (*kinfu_) (depth_device_, image_view_.colors_device_);
         else
           has_image = (*kinfu_) (depth_device_,pose);
+        pose = kinfu_->getCameraPose();
+         cout << "org_pose" << org_pose_.matrix() << endl;
+        cout << "real_pose" << pose_.matrix() << endl;
+        cout <<"new_pose" << pose.matrix() << endl;
       }
 
       image_view_.showDepth (depth_);
@@ -921,7 +934,6 @@ struct KinFuLSApp
       source_depth_data_.resize(depth_.cols * depth_.rows);
       depth_wrapper->fillDepthImageRaw(depth_.cols, depth_.rows, &source_depth_data_[0]);
       depth_.data = &source_depth_data_[0];
-      //std::cout << depth_.cols << ";" << depth_.rows;
     }
     data_ready_cond_.notify_one();
   }
@@ -961,7 +973,6 @@ struct KinFuLSApp
     {                             
       //std::cout << "Giving colors1\n";
       boost::mutex::scoped_try_lock lock(data_ready_mutex_);
-      std::cout << lock << std::endl;
       if (exit_ || !lock)
         return;
       //std::cout << "Giving colors2\n";
@@ -1008,11 +1019,19 @@ struct KinFuLSApp
         //std::cout << "Giving colors2\n";
         int width  = cloud->width;
         int height = cloud->height;
+        Vector4f origin = cloud->sensor_origin_;
+        Quaternionf quaternion = cloud->sensor_orientation_;
+        pose_= Translation3f(Vector3f(origin[0], origin[1], origin[2])) * AngleAxisf(quaternion.matrix());
+
+        if(first){
+            org_pose_ = pose_;
+            first=false;
+        }
+
 
         depth_.cols = width;
         depth_.rows = height;
         depth_.step = depth_.cols * depth_.elemSize();
-        //cout << "size : "<< depth_.elemSize() << "width:"<< width << height<< endl;
 
         source_depth_data_.resize(depth_.cols * depth_.rows);
 
@@ -1022,7 +1041,7 @@ struct KinFuLSApp
         source_image_data_.resize(rgb24_.cols * rgb24_.rows);
 
 
-        unsigned char *rgb    = (unsigned char *)  &source_image_data_[0];
+        //unsigned char *rgb    = (unsigned char *)  &source_image_data_[0];
         unsigned short *depth = (unsigned short *) &source_depth_data_[0];
 
 
@@ -1038,18 +1057,6 @@ struct KinFuLSApp
         rgb24_.data = &source_image_data_[0];
         depth_.data = &source_depth_data_[0];
 
-        //flip depth image, because its upside down (??)
-        for( int y=0; y<height/2; y++ )
-        {
-              for( int x=0; x<width; x++ )
-                {
-
-                        unsigned short tmp =source_depth_data_[width*y+x];
-                        source_depth_data_[width*y+x] = source_depth_data_[width*(height-y-1)+x];
-                        source_depth_data_[width*(height-y-1)+x] = tmp;
-                       //   cout << "data:" <<tmp << endl;
-                }
-        }
       }
       data_ready_cond_.notify_one();
    }
@@ -1099,8 +1106,7 @@ struct KinFuLSApp
         catch (const std::bad_alloc& /*e*/) { cout << "Bad alloc" << endl; break; }
         catch (const std::exception& /*e*/) { cout << "Exception" << endl; break; }
 
-        scene_cloud_view_.cloud_viewer_.spinOnce (3);
-        //~ cout << "In main loop" << endl;                  
+        scene_cloud_view_.cloud_viewer_.spinOnce (3);                
       } 
       exit_ = true;
       boost::this_thread::sleep (boost::posix_time::millisec (100));
@@ -1173,6 +1179,7 @@ struct KinFuLSApp
   bool scan_;
   bool scan_mesh_;
   bool scan_volume_;
+  bool first;
 
   bool independent_camera_;
   int frame_counter_;
@@ -1208,6 +1215,9 @@ struct KinFuLSApp
   PtrStepSz<const pcl::gpu::kinfuLS::PixelRGB> rgb24_;  
   
   Eigen::Affine3f delta_lost_pose_;
+  Eigen::Affine3f initial_pose_;
+  Eigen::Affine3f pose_;
+  Eigen::Affine3f org_pose_;
   
   bool was_lost_;
 
@@ -1416,7 +1426,12 @@ main (int argc, char* argv[])
   pc::parse_argument (argc, argv, "--snapshot_rate", snapshot_rate);
   pc::parse_argument (argc, argv, "-sr", snapshot_rate);
 
-  KinFuLSApp app (*capture, volume_size, shift_distance, snapshot_rate);
+  bool disable_icp = false;
+  if (pc::find_switch (argc, argv, "--dicp"))
+      disable_icp = true;
+
+
+  KinFuLSApp app (*capture, volume_size, shift_distance, snapshot_rate,disable_icp);
 
   if (pc::parse_argument (argc, argv, "-eval", eval_folder) > 0)
     app.toggleEvaluationMode(eval_folder, match_file);
@@ -1425,11 +1440,13 @@ main (int argc, char* argv[])
   {
         app.rgbd_source_=true;
         float fx=470.9056907f,fy=470.9056907f,cx=399.5f ,cy=299.5f;
+        app.first=true;
         app.initRGBDMode(fx, fy, cx, cy);
 
   }
   if (pc::find_switch (argc, argv, "--current-cloud") || pc::find_switch (argc, argv, "-cc"))
     app.initCurrentFrameView ();
+
 
   if (pc::find_switch (argc, argv, "--save-views") || pc::find_switch (argc, argv, "-sv"))
     app.image_view_.accumulate_views_ = true;  //will cause bad alloc after some time  

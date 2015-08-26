@@ -673,7 +673,6 @@ pcl::gpu::kinfuLS::KinfuTracker::operator() (const DepthMap& depth_raw,  const E
   {
     float rnorm = rodrigues2(current_global_rotation.inverse() * last_known_global_rotation).norm();
     float tnorm = (current_global_translation - last_known_global_translation).norm();
-    cout << current_global_translation << last_known_global_translation << endl;
     const float alpha = 1.f;
     bool integrate = (rnorm + alpha * tnorm)/2 >= integration_metric_threshold_;
     ///////////////////////////////////////////////////////////////////////////////////////////

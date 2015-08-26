@@ -43,6 +43,13 @@
 #include <pcl/for_each_type.h>
 #include <pcl/io/lzf_image_io.h>
 #include <pcl/console/time.h>
+#include <png.h>
+#include <boost/lexical_cast.hpp>
+
+#include "Image/Camera.hh"
+#include "Base/Image/ImageIO.hh"
+
+
 
 #ifdef PCL_BUILT_WITH_VTK
   #include <vtkImageReader2.h>
@@ -55,6 +62,7 @@
   #include <vtkPNMReader.h>
   #include <vtkPNGWriter.h>
 #endif
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////// GrabberImplementation //////////////////////
@@ -131,7 +139,12 @@ struct pcl::ImageGrabberBase::ImageGrabberImpl
   bool
   getVtkImage (const std::string &filename, vtkSmartPointer<vtkImageData> &image) const;
 #endif//PCL_BUILT_WITH_VTK
-  
+
+  void
+  getPNGImage (const std::string &filename,unsigned char *&depth_pixel,int *dims, Eigen::Quaternionf &camera_quaternion,Eigen::Vector3f &camera_center) const;
+  void
+  getMIPImage(const std::string &filename, float *&depth_pixel, int *dims,  Eigen::Quaternionf &camera_quaternion,Eigen::Vector3f &camera_center) const;
+
   pcl::ImageGrabberBase& grabber_;
   float frames_per_second_;
   bool repeat_;
@@ -159,15 +172,16 @@ struct pcl::ImageGrabberBase::ImageGrabberImpl
   //! Flag to say if a user set the focal length by hand
   //  (so we don't attempt to adjust for QVGA, QQVGA, etc).
   bool pclzf_mode_;
+  bool load_mip_;
 
   float depth_image_units_;
+
 
   bool manual_intrinsics_;
   double focal_length_x_;
   double focal_length_y_;
   double principal_point_x_;
   double principal_point_y_;
-
   unsigned int num_threads_;
 };
 
@@ -476,6 +490,7 @@ bool
 pcl::ImageGrabberBase::ImageGrabberImpl::isValidExtension (const std::string &extension)
 {
   bool valid;
+  load_mip_=false;
   if(pclzf_mode_)
   {
     valid = extension == ".PCLZF" || extension == ".XML";
@@ -485,6 +500,11 @@ pcl::ImageGrabberBase::ImageGrabberImpl::isValidExtension (const std::string &ex
     valid = extension == ".TIFF" || extension == ".PNG" 
          || extension == ".JPG" || extension == ".JPEG"
          || extension == ".PPM";
+  }
+  if (extension == ".MIP")
+  {
+      valid = true;
+      load_mip_=true;
   }
   return (valid);
 }
@@ -558,8 +578,10 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
   {
     return (false);
   }
-  unsigned char* depth_pixel;
+  float* depth_pixel;
+  unsigned char * depth_pixel_char;
   unsigned char* color_pixel;
+  //REMOVED VTK LOADING IMPLEMENTED DIRECT LIBPNG LODING
   vtkSmartPointer<vtkImageData> depth_image;
   vtkSmartPointer<vtkImageData> rgb_image;
   const std::string &depth_image_file = depth_image_files_[idx];
@@ -573,15 +595,27 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
       return (false);
     }
   }
-  if (!getVtkImage (depth_image_file, depth_image) )
-  {
-    return (false);
+  int* dims = new int[2];
+  Eigen::Quaternionf camera_quaternion;
+  Eigen::Vector3f camera_center;
+  if(load_mip_){
+      getMIPImage (depth_image_file,depth_pixel,dims,camera_quaternion,camera_center);
+   }
+  else{
+      getPNGImage (depth_image_file,depth_pixel_char,dims,camera_quaternion,camera_center);
   }
+  cout << "filename:" << depth_image_file << endl;
 
-  int* dims = depth_image->GetDimensions ();
+
+//  if (!getVtkImage (depth_image_file, depth_image) )
+//  {
+//    return (false);
+//  }
+
+  //int* dims = depth_image->GetDimensions ();
 
   // Fill in image data
-  depth_pixel = static_cast<unsigned char*>(depth_image->GetScalarPointer ());
+  //depth_pixel = static_cast<unsigned char*>(depth_image->GetScalarPointer ());
   
   // Set up intrinsics
   float scaleFactorX, scaleFactorY;
@@ -646,24 +680,44 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
     cloud.width = dims[0];
     cloud.height = dims[1];
     cloud.is_dense = false;
-    cloud.points.resize (depth_image->GetNumberOfPoints ());
-    for (int y = 0; y < dims[1]; ++y)
+    cloud.points.resize (dims[0]*dims[1]);
+    if(load_mip_)
     {
-      for (int x = 0; x < dims[0]; ++x, ++depth_pixel)
-      {
-        pcl::PointXYZ &pt = cloud.at (x,y);
-        float depth = static_cast<float> (*depth_pixel) * depth_image_units_;
-        //cout << "depth: " << depth << endl;
-        if (depth == 0.0f) 
-          pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
-        else
+        for (int y = 0; y < dims[1]; ++y)
         {
-          pt.x = ((float)x - centerX) * scaleFactorX * depth;
-          pt.y = ((float)y - centerY) * scaleFactorY * depth; 
-          pt.z = depth;
+          for (int x = 0; x < dims[0]; ++x, ++depth_pixel)
+          {
+            pcl::PointXYZ &pt = cloud.at (x,y);
+            float depth = *depth_pixel * depth_image_units_;
+            if (depth == 0.0f)
+              pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
+            else
+            {
+              pt.x = ((float)x - centerX) * scaleFactorX * depth;
+              pt.y = ((float)y - centerY) * scaleFactorY * depth;
+              pt.z = depth;
+            }
+          }
         }
-      }
+    }else{
+        for (int y = 0; y < dims[1]; ++y)
+        {
+          for (int x = 0; x < dims[0]; ++x, ++depth_pixel_char)
+          {
+            pcl::PointXYZ &pt = cloud.at (x,y);
+            float depth = *depth_pixel_char * depth_image_units_;
+            if (depth == 0.0f)
+              pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
+            else
+            {
+              pt.x = ((float)x - centerX) * scaleFactorX * depth;
+              pt.y = ((float)y - centerY) * scaleFactorY * depth;
+              pt.z = depth;
+            }
+          }
+        }
     }
+
     // Handle timestamps
     pcl::uint64_t timestamp;
     if (getTimestampFromFilepath (depth_image_file, timestamp))
@@ -671,11 +725,11 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
       cloud.header.stamp = timestamp;
     }
 
-    pcl::toPCLPointCloud2 (cloud, blob);
+   pcl::toPCLPointCloud2 (cloud, blob);
   }
   // Origin 0, orientation is forward
-  origin = Eigen::Vector4f::Zero ();
-  orientation = Eigen::Quaternionf::Identity ();
+  origin =  Eigen::Vector4f(camera_center[0],camera_center[1],camera_center[2],0);
+  orientation = camera_quaternion;
 
   return (true);
 #else
@@ -878,6 +932,140 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getVtkImage (
 }
 #endif //PCL_BUILT_WITH_VTK
 
+
+
+void pcl::ImageGrabberBase::ImageGrabberImpl::getPNGImage(const std::string &filename, unsigned char *&depth_pixel, int *dims,  Eigen::Quaternionf &camera_quaternion,Eigen::Vector3f &camera_center) const
+{
+
+        int width, height;
+        //png_byte color_type;
+        //png_byte bit_depth;
+        unsigned int bytesPerRow;
+
+        png_structp png_ptr;
+        png_infop info_ptr;
+        //int number_of_passes;
+        png_bytep* row_pointers;
+        //unsigned char* data;
+
+
+        unsigned char header[8];    // 8 is the maximum size that can be checked
+
+        /* open file and test for it being a png */
+        FILE *fp = fopen(filename.c_str(), "rb");
+
+        if (!fp)
+                PCL_ERROR ("[pcl::ImageGrabber::getPNGImage] File %s could not be opened for reading\n", filename.c_str ());
+        fread(header, 1, 8, fp);
+        if (png_sig_cmp(header, 0, 8))
+                PCL_ERROR ("[pcl::ImageGrabber::getPNGImage]  File %s is not recognized as a PNG file\n", filename.c_str ());
+
+
+        /* initialize stuff */
+        png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+
+        if (!png_ptr)
+            PCL_ERROR ("[pcl::ImageGrabber::getPNGImage]  png_create_read_struct failed from %s\n",filename.c_str());
+
+        info_ptr = png_create_info_struct(png_ptr);
+        if (!info_ptr)
+            PCL_ERROR ("[pcl::ImageGrabber::getPNGImage]  png_create_info_struct failed from %s\n",filename.c_str());
+
+        if (setjmp(png_jmpbuf(png_ptr)))
+            PCL_ERROR ("[pcl::ImageGrabber::getPNGImage]  Error during init_io from %s\n",filename.c_str());
+
+
+        png_init_io(png_ptr, fp);
+        png_set_sig_bytes(png_ptr, 8);
+
+        png_read_info(png_ptr, info_ptr);
+
+        width = png_get_image_width(png_ptr, info_ptr);
+        height = png_get_image_height(png_ptr, info_ptr);
+        //color_type = png_get_color_type(png_ptr, info_ptr);
+        //bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+        bytesPerRow = png_get_rowbytes(png_ptr, info_ptr);
+
+        dims[0] = width;
+        dims[1] = height;
+        //number_of_passes = png_set_interlace_handling(png_ptr);
+        png_read_update_info(png_ptr, info_ptr);
+
+        row_pointers = new png_bytep[height];
+        depth_pixel = new unsigned char[bytesPerRow * height];
+        for (int i=0; i<height; i++)
+        {
+          row_pointers[i] = depth_pixel + i*bytesPerRow;
+        }
+        png_read_image(png_ptr, row_pointers);
+
+        png_textp text_ptr;
+        int num_text;
+        camera_center = Eigen::Vector3f(0,0,0);
+
+        if (png_get_text(png_ptr, info_ptr, &text_ptr, &num_text) == 7)
+              {
+                camera_center[0] = boost::lexical_cast<double>(text_ptr[0].text);
+                camera_center[1] = boost::lexical_cast<double>(text_ptr[1].text);
+                camera_center[2] = boost::lexical_cast<double>(text_ptr[2].text);
+                camera_quaternion.x() = boost::lexical_cast<double>(text_ptr[3].text);
+                camera_quaternion.y() = boost::lexical_cast<double>(text_ptr[4].text);
+                camera_quaternion.z() = boost::lexical_cast<double>(text_ptr[5].text);
+                camera_quaternion.w() = boost::lexical_cast<double>(text_ptr[6].text);
+              }
+
+        /* read file */
+        if (setjmp(png_jmpbuf(png_ptr)))
+             PCL_ERROR ("[pcl::ImageGrabber::getPNGImage]  Error during read_image from %s\n",filename.c_str());
+
+        fclose(fp);
+}
+
+void pcl::ImageGrabberBase::ImageGrabberImpl::getMIPImage(const std::string &filename, float *&depth_pixel, int *dims,  Eigen::Quaternionf &camera_quaternion,Eigen::Vector3f &camera_center) const
+{
+    BIAS::Camera<float> cam;
+
+
+    if (BIAS::ImageIO::Load(filename, cam)!=0){
+      BIASERR("error reading "  << filename);
+    }
+    cam.ParseMetaData();
+
+    BIAS::Projection Proj = cam.GetProj();
+
+    BIAS::Vector3< double >  C = Proj.GetParameters()->GetC();
+    double * R = Proj.GetParameters()->GetR().GetData();
+    BIAS::Quaternion<double> Q = Proj.GetQ();
+    double * Qdouble = Q.GetData();
+    dims[0] = cam.GetWidth();
+    dims[1] = cam.GetHeight();
+    float * img = cam.GetImageData();
+
+    depth_pixel = new float[dims[0] * dims[1]];
+    for (int i=0; i<dims[0]*dims[1]; i++)
+    {
+      depth_pixel[i] = 10* img[i];
+    }
+
+    camera_center[0] = C[0];
+    camera_center[1] = C[1];
+    camera_center[2] = C[2];
+
+    camera_quaternion.x() = Qdouble[0];
+    camera_quaternion.y() = Qdouble[1];
+    camera_quaternion.z() = Qdouble[2];
+    camera_quaternion.w() = Qdouble[3];
+
+//    //for debuging casts
+//    std::cout.precision(10);
+//    cout << "Rotation:" << Proj.GetParameters()->GetR()
+//         << "Center:" << Proj.GetParameters()->GetC()
+//         << "Quaternion" << Qdouble
+//         << endl;
+
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 size_t
 pcl::ImageGrabberBase::ImageGrabberImpl::numFrames () const
@@ -899,7 +1087,6 @@ pcl::ImageGrabberBase::ImageGrabberBase (const std::string& rgb_dir, const std::
   : impl_ (new ImageGrabberImpl (*this, rgb_dir, depth_dir, frames_per_second, repeat))
 {
 }
-
 ///////////////////////////////////////////////////////////////////////////////////////////
 pcl::ImageGrabberBase::ImageGrabberBase (const std::vector<std::string>& depth_image_files, float frames_per_second, bool repeat)
   : impl_ (new ImageGrabberImpl (*this, depth_image_files, frames_per_second, repeat))
@@ -1021,7 +1208,6 @@ pcl::ImageGrabberBase::getCameraIntrinsics (double &focal_length_x,
   principal_point_x = impl_->principal_point_x_;
   principal_point_y = impl_->principal_point_y_;
 }
-
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
