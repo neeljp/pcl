@@ -580,6 +580,7 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
   }
   float* depth_pixel;
   unsigned char * depth_pixel_char;
+  unsigned short * depth_pixel_short;
   unsigned char* color_pixel;
   //REMOVED VTK LOADING IMPLEMENTED DIRECT LIBPNG LODING
   vtkSmartPointer<vtkImageData> depth_image;
@@ -602,20 +603,22 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
       getMIPImage (depth_image_file,depth_pixel,dims,camera_quaternion,camera_center);
    }
   else{
-      getPNGImage (depth_image_file,depth_pixel_char,dims,camera_quaternion,camera_center);
+    getPNGImage (depth_image_file,depth_pixel_char,dims,camera_quaternion,camera_center);
+//    if (!getVtkImage (depth_image_file, depth_image) )
+//    {
+//      return (false);
+//    }
+
+//    dims = depth_image->GetDimensions ();
+
+//    // Fill in image data
+//    depth_pixel_short = static_cast<unsigned short*>(depth_image->GetScalarPointer ());
   }
   cout << "filename:" << depth_image_file << endl;
 
 
-//  if (!getVtkImage (depth_image_file, depth_image) )
-//  {
-//    return (false);
-//  }
 
-  //int* dims = depth_image->GetDimensions ();
 
-  // Fill in image data
-  //depth_pixel = static_cast<unsigned char*>(depth_image->GetScalarPointer ());
   
   // Set up intrinsics
   float scaleFactorX, scaleFactorY;
@@ -705,7 +708,7 @@ pcl::ImageGrabberBase::ImageGrabberImpl::getCloudVTK (size_t idx,
           for (int x = 0; x < dims[0]; ++x, ++depth_pixel_char)
           {
             pcl::PointXYZ &pt = cloud.at (x,y);
-            float depth = *depth_pixel_char * depth_image_units_;
+            float depth = static_cast<float> (*depth_pixel_char) * depth_image_units_;
             if (depth == 0.0f)
               pt.x = pt.y = pt.z = std::numeric_limits<float>::quiet_NaN ();
             else

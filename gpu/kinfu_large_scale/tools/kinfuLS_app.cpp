@@ -251,7 +251,7 @@ boost::shared_ptr<pcl::PolygonMesh> convertToMesh(const DeviceArray<PointXYZ>& t
 
 struct CurrentFrameCloudView
 {
-  CurrentFrameCloudView() : cloud_device_ (480, 640), cloud_viewer_ ("Frame Cloud Viewer")
+  CurrentFrameCloudView() : cloud_device_ (600, 800), cloud_viewer_ ("Frame Cloud Viewer")
   {
     cloud_ptr_ = PointCloud<PointXYZ>::Ptr (new PointCloud<PointXYZ>);
 
@@ -259,8 +259,8 @@ struct CurrentFrameCloudView
     cloud_viewer_.setPointCloudRenderingProperties (visualization::PCL_VISUALIZER_POINT_SIZE, 1);
     cloud_viewer_.addCoordinateSystem (1.0, "global");
     cloud_viewer_.initCameraParameters ();
-    cloud_viewer_.setPosition (0, 500);
-    cloud_viewer_.setSize (640, 480);
+    cloud_viewer_.setPosition (0, 800);
+    cloud_viewer_.setSize (800, 600);
     cloud_viewer_.setCameraClipDistances (0.01, 10.01);
   }
 
@@ -299,7 +299,7 @@ struct ImageView
     viewerScene_.setWindowTitle ("View3D from ray tracing");
     viewerScene_.setPosition (0, 0);
     viewerDepth_.setWindowTitle ("Depth stream");
-    viewerDepth_.setPosition (640, 0);
+    viewerDepth_.setPosition (800, 0);
     //viewerColor_.setWindowTitle ("Kinect RGB stream");
   }
 
@@ -520,6 +520,11 @@ struct SceneCloudView
       cloud_viewer_.updateText ("ICP State: LOST", 450, 55, 20, 1.0, 0.0, 0.0, "icp");
       cloud_viewer_.updateText ("Press 'S' to save the current world", 450, 35, 10, 1.0, 0.0, 0.0, "icp_save");
       cloud_viewer_.updateText ("Press 'R' to reset the system", 450, 15, 10, 1.0, 0.0, 0.0, "icp_reset");
+    }else if(kinfu.getDisableICP()){
+
+        cloud_viewer_.updateText ("ICP State: DISABLED", 450, 55, 20, 1.0, 0.0, 0.0, "icp");
+        cloud_viewer_.updateText ("Press 'S' to save the current world", 450, 35, 10, 1.0, 0.0, 0.0, "icp_save");
+        cloud_viewer_.updateText ("Press 'R' to reset the system", 450, 15, 10, 1.0, 0.0, 0.0, "icp_reset");
     }
     
     
@@ -830,16 +835,24 @@ struct KinFuLSApp
 
       {
         SampledScopeTime fps(time_ms_);
-        Eigen::Affine3f pose;
-        Eigen::Vector3f V = pose_.linear().transpose() * Translation3f(pose_.translation()).vector() - org_pose_.linear().transpose() * Translation3f(org_pose_.translation()).vector();
-        Eigen::Translation3f T =  Translation3f(V+Translation3f(initial_pose_.translation()).vector());
 
-        Eigen::Matrix3f R =   pose_.linear().transpose() * org_pose_.linear();
+        Eigen::Affine3f pose;
+        if(kinfu_->getDisableICP()){
+            Eigen::Vector3f V = pose_.linear().transpose() * Translation3f(pose_.translation()).vector() - org_pose_.linear().transpose() * Translation3f(org_pose_.translation()).vector();
+            Eigen::Translation3f T =  Translation3f(V+Translation3f(initial_pose_.translation()).vector());
+
+            Eigen::Matrix3f R =   pose_.linear().transpose() * org_pose_.linear();
+            cout <<"vector: "<< endl << V << endl << "translation: "<< endl <<T.vector()<< endl
+                <<"rotation: " << endl << R <<endl
+               << "pose: " << endl <<pose.matrix()<< endl;
 
         pose = T * AngleAxisf(R);
-        cout <<"vector: " <<V << endl << "translation: " <<T.vector()<< endl
-            <<"rotation: " << R <<endl
-           << "pose: " << pose.matrix()<< endl;
+        } else
+        {
+          pose = kinfu_->getCameraPose();
+        }
+
+
 
 
         //run kinfu algorithm
@@ -848,9 +861,9 @@ struct KinFuLSApp
         else
           has_image = (*kinfu_) (depth_device_,pose);
         pose = kinfu_->getCameraPose();
-         cout << "org_pose" << org_pose_.matrix() << endl;
-        cout << "real_pose" << pose_.matrix() << endl;
-        cout <<"new_pose" << pose.matrix() << endl;
+         cout << "org_pose" << endl << org_pose_.matrix() << endl;
+        cout << "real_pose" << endl << pose_.matrix() << endl;
+        cout <<"new_pose" << endl <<pose.matrix() << endl;
       }
 
       image_view_.showDepth (depth_);

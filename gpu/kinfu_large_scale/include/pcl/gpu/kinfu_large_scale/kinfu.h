@@ -223,6 +223,13 @@ namespace pcl
           {
             return (lost_);
           }
+
+          /** \brief Returns true if ICP is currently disabled */
+          bool
+          getDisableICP ()
+          {
+            return (disable_icp_);
+          }
           
           /** \brief Performs the tracker reset to initial  state. It's used if camera tracking fails. */
           void

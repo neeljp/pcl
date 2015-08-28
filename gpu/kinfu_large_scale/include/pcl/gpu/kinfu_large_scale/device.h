@@ -61,15 +61,15 @@ namespace pcl
       const int DIVISOR = 32767;     // SHRT_MAX;
       
       //RGB images resolution
-      const float  HEIGHT = 480.0f;
-      const float  WIDTH = 640.0f;
+      const float  HEIGHT = 600.0f;
+      const float  WIDTH = 800.0f;
 
       //Should be multiple of 32
       enum { VOLUME_X = 512, VOLUME_Y = 512, VOLUME_Z = 512 };
 
           
       //Temporary constant (until we make it automatic) that holds the Kinect's focal length
-      const float FOCAL_LENGTH = 575.816f;
+      const float FOCAL_LENGTH = 470.9056907f;  //575.816f;
     
       const float VOLUME_SIZE = 3.0f; // physical size represented by the TSDF volume. In meters
       const float DISTANCE_THRESHOLD = 1.5f; // when the camera target point is farther than DISTANCE_THRESHOLD from the current cube's center, shifting occurs. In meters
